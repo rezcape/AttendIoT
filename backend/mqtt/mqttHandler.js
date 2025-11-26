@@ -68,7 +68,7 @@ const processDevice = async (deviceData, scannerId, io) => {
             }
         } else {
             // Unknown device
-            // console.log(`Unknown device: ${normalizedMac}`);
+            console.log(`Unknown device: ${normalizedMac}`);
         }
     } catch (err) {
         console.error(`Error processing device ${deviceData.mac}:`, err);

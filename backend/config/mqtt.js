@@ -1,11 +1,17 @@
 const mqtt = require('mqtt');
 
 const connectMQTT = () => {
-    const client = mqtt.connect(`mqtt://${process.env.MQTT_BROKER}:${process.env.MQTT_PORT}`, {
-        username: process.env.MQTT_USERNAME,
-        password: process.env.MQTT_PASSWORD,
+    const options = {
         reconnectPeriod: 5000 // Auto-reconnect every 5 seconds
-    });
+    };
+
+    // Only add auth if credentials exist
+    if (process.env.MQTT_USERNAME) {
+        options.username = process.env.MQTT_USERNAME;
+        options.password = process.env.MQTT_PASSWORD;
+    }
+
+    const client = mqtt.connect(`mqtt://${process.env.MQTT_BROKER}:${process.env.MQTT_PORT}`, options);
 
     client.on('connect', () => {
         console.log(`✓ MQTT connected to broker ${process.env.MQTT_BROKER}:${process.env.MQTT_PORT}`);

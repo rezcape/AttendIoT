@@ -26,6 +26,10 @@ interface RegisterData {
   studentId?: string;
 }
 
+import api from '@/lib/api';
+
+// ... (interfaces remain the same)
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -34,52 +38,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for stored token on mount
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      
+      if (token && storedUser) {
+        // Optionally verify token validity here with an API call like /auth/profile
+        // For now, we'll trust the stored user but maybe clear it on 401 later
+        try {
+            setUser(JSON.parse(storedUser));
+        } catch (e) {
+            console.error("Failed to parse stored user", e);
+            // Fallback/Logout logic could go here
+        }
+      }
+      setIsLoading(false);
+    };
     
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    checkAuth();
   }, []);
 
   const login = async (email: string, password: string, rememberMe = false) => {
     try {
-      // Simulated API call - replace with actual API endpoint
-      // const response = await axios.post('/api/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       
-      // Mock authentication
-      const mockUser: User = {
-        id: '1',
-        name: 'John Doe',
-        email: email,
-        role: email.includes('admin') ? 'admin' : 'student',
-        studentId: email.includes('admin') ? undefined : 'STU001'
+      const { token, data: userData } = response.data;
+      
+      const userObj: User = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        // studentId might be in userData if the backend sends it, adapt if needed
+        studentId: userData.studentId 
       };
 
-      const mockToken = 'mock-jwt-token-' + Date.now();
-
       if (rememberMe) {
-        localStorage.setItem('token', mockToken);
-        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userObj));
       } else {
-        sessionStorage.setItem('token', mockToken);
-        sessionStorage.setItem('user', JSON.stringify(mockUser));
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('user', JSON.stringify(userObj));
       }
 
-      setUser(mockUser);
+      setUser(userObj);
       
       toast({
         title: 'Login successful',
-        description: `Welcome back, ${mockUser.name}!`,
+        description: `Welcome back, ${userObj.name}!`,
       });
 
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
+      let message = 'Invalid email or password';
+      if (error) {
+        if (error.response?.data?.message) {
+          message = error.response.data.message;
+        } else if (error.message) {
+          message = error.message;
+        }
+      }
+      
       toast({
         title: 'Login failed',
-        description: 'Invalid email or password',
+        description: message,
         variant: 'destructive',
       });
       throw error;
@@ -88,35 +110,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (data: RegisterData) => {
     try {
-      // Simulated API call - replace with actual API endpoint
-      // const response = await axios.post('/api/auth/register', data);
+      const response = await api.post('/auth/register', data);
       
-      // Mock registration
-      const mockUser: User = {
-        id: Date.now().toString(),
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        studentId: data.studentId
+      const { token, data: userData } = response.data;
+
+      const userObj: User = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        studentId: userData.studentId
       };
 
-      const mockToken = 'mock-jwt-token-' + Date.now();
+      // Default to localStorage for registration flow usually, or match login behavior
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userObj));
 
-      localStorage.setItem('token', mockToken);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-
-      setUser(mockUser);
+      setUser(userObj);
       
       toast({
         title: 'Registration successful',
-        description: `Welcome, ${mockUser.name}!`,
+        description: `Welcome, ${userObj.name}!`,
       });
 
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
+      let message = 'An error occurred during registration';
+      if (error) {
+        if (error.response?.data?.message) {
+          message = error.response.data.message;
+        } else if (error.message) {
+          message = error.message;
+        }
+      }
+
       toast({
         title: 'Registration failed',
-        description: 'An error occurred during registration',
+        description: message,
         variant: 'destructive',
       });
       throw error;

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Square, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useSocket } from '@/contexts/SocketContext';
 
 interface DetectedDevice {
   id: string;
@@ -13,19 +14,74 @@ interface DetectedDevice {
   rssi: number;
 }
 
-const mockDevices: DetectedDevice[] = [
-  { id: '1', studentName: 'Alice Johnson', studentId: 'STU001', time: '08:15:23', rssi: -45 },
-  { id: '2', studentName: 'Bob Smith', studentId: 'STU002', time: '08:15:45', rssi: -52 },
-  { id: '3', studentName: 'Carol Williams', studentId: 'STU003', time: '08:16:12', rssi: -48 },
-];
-
 export default function LiveMonitor() {
+  const { socket, isConnected } = useSocket();
   const [isScanning, setIsScanning] = useState(false);
-  const [devices, setDevices] = useState<DetectedDevice[]>(mockDevices);
+  const [devices, setDevices] = useState<DetectedDevice[]>([]);
   const [sessionTime, setSessionTime] = useState(0);
+
+  // Session timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isScanning) {
+      interval = setInterval(() => {
+        setSessionTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isScanning]);
+
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleDeviceDetected = (data: any) => {
+        if (!isScanning) return;
+        
+        // Data might come in different structures depending on the MQTT payload
+        // Assuming payload has 'devices' array or single device info
+        // backend/mqtt/mqttHandler.js emits 'device-detected' with the whole payload
+        
+        console.log("Device detected:", data);
+
+        // Adapt this based on your actual MQTT payload structure
+        // For now, let's assume data.devices is an array of { mac, rssi } 
+        // and we need to map it to our display format.
+        // Since the backend might not send student name immediately in the raw scan event
+        // we might display MAC address or 'Unknown' if name isn't resolved yet.
+        // OR: The backend 'attendance-update' event emits the fully resolved record.
+        // Let's listen to 'attendance-update' for confirmed students.
+    };
+    
+    const handleAttendanceUpdate = (record: any) => {
+        if (!isScanning) return;
+
+        const newDevice: DetectedDevice = {
+            id: record._id || Date.now().toString(),
+            studentName: record.studentId?.name || 'Unknown Student',
+            studentId: record.studentId?.studentId || 'N/A',
+            time: new Date().toLocaleTimeString(),
+            rssi: record.rssi || 0
+        };
+
+        setDevices(prev => [newDevice, ...prev].slice(0, 50)); // Keep last 50
+    };
+
+    socket.on('device-detected', handleDeviceDetected);
+    socket.on('attendance-update', handleAttendanceUpdate);
+
+    return () => {
+      socket.off('device-detected', handleDeviceDetected);
+      socket.off('attendance-update', handleAttendanceUpdate);
+    };
+  }, [socket, isScanning]);
 
   const toggleScanning = () => {
     setIsScanning(!isScanning);
+    if (!isScanning) {
+        setDevices([]); // Clear previous session
+        setSessionTime(0);
+    }
   };
 
   return (
@@ -36,6 +92,12 @@ export default function LiveMonitor() {
           <p className="text-muted-foreground mt-2">Real-time attendance detection.</p>
         </div>
         <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className={`h-3 w-3 rounded-full ${isConnected ? 'bg-success' : 'bg-destructive'}`} />
+             <span className="text-sm text-muted-foreground">
+              {isConnected ? 'Socket Connected' : 'Socket Disconnected'}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <div className={`h-3 w-3 rounded-full ${isScanning ? 'bg-success animate-pulse' : 'bg-muted'}`} />
             <span className="text-sm text-muted-foreground">
@@ -106,7 +168,8 @@ export default function LiveMonitor() {
               <div>
                 <p className="text-sm text-muted-foreground">Attendance Rate</p>
                 <h3 className="text-3xl font-bold mt-2">
-                  {devices.length > 0 ? Math.round((devices.length / 248) * 100) : 0}%
+                  {/* Placeholder logic for rate - requires total students count */}
+                   - 
                 </h3>
               </div>
             </CardContent>
