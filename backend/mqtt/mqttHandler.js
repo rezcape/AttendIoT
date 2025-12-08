@@ -7,6 +7,7 @@ const handleMQTTMessage = async (topic, message, io) => {
         const payload = JSON.parse(msgString);
 
         console.log(`MQTT Message received on ${topic}`);
+        console.log('Raw Payload:', JSON.stringify(payload, null, 2)); // Debug: Log full payload
         
         if (topic === 'attendance/room101/scan') {
             // Emit raw device detected event

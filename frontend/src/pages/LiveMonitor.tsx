@@ -1,17 +1,32 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Square, Wifi } from 'lucide-react';
+import { Play, Square, Wifi, UserPlus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSocket } from '@/contexts/SocketContext';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 interface DetectedDevice {
-  id: string;
+  id: string; // This will be the MAC address for uniqueness
   studentName: string;
   studentId: string;
+  macAddress: string;
   time: string;
   rssi: number;
+  isRegistered: boolean;
 }
 
 export default function LiveMonitor() {
@@ -19,6 +34,13 @@ export default function LiveMonitor() {
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<DetectedDevice[]>([]);
   const [sessionTime, setSessionTime] = useState(0);
+  
+  // Registration Dialog State
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [selectedMac, setSelectedMac] = useState('');
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentId, setNewStudentId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false); // Define missing state
 
   // Session timer
   useEffect(() => {
@@ -38,33 +60,66 @@ export default function LiveMonitor() {
     const handleDeviceDetected = (data: any) => {
         if (!isScanning) return;
         
-        // Data might come in different structures depending on the MQTT payload
-        // Assuming payload has 'devices' array or single device info
-        // backend/mqtt/mqttHandler.js emits 'device-detected' with the whole payload
-        
-        console.log("Device detected:", data);
-
-        // Adapt this based on your actual MQTT payload structure
-        // For now, let's assume data.devices is an array of { mac, rssi } 
-        // and we need to map it to our display format.
-        // Since the backend might not send student name immediately in the raw scan event
-        // we might display MAC address or 'Unknown' if name isn't resolved yet.
-        // OR: The backend 'attendance-update' event emits the fully resolved record.
-        // Let's listen to 'attendance-update' for confirmed students.
+        // Data structure: { device_id: string, devices: [{ mac: string, rssi: number }] }
+        if (data && data.devices && Array.isArray(data.devices)) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            setDevices(prevDevices => {
+                const newDevicesMap = new Map(prevDevices.map(d => [d.macAddress, d]));
+                
+                data.devices.forEach((device: any) => {
+                    const existing = newDevicesMap.get(device.mac);
+                    
+                    if (existing) {
+                        newDevicesMap.set(device.mac, {
+                            ...existing,
+                            rssi: device.rssi,
+                            time: timestamp
+                        });
+                    } else {
+                        // Only add if not already present
+                        newDevicesMap.set(device.mac, {
+                            id: device.mac,
+                            studentName: device.name || 'Unknown Device',
+                            studentId: 'Scanning...',
+                            macAddress: device.mac,
+                            time: timestamp,
+                            rssi: device.rssi,
+                            isRegistered: false
+                        });
+                    }
+                });
+                
+                return Array.from(newDevicesMap.values())
+                    .sort((a, b) => b.time.localeCompare(a.time))
+                    .slice(0, 50);
+            });
+        }
     };
     
     const handleAttendanceUpdate = (record: any) => {
         if (!isScanning) return;
 
-        const newDevice: DetectedDevice = {
-            id: record._id || Date.now().toString(),
-            studentName: record.studentId?.name || 'Unknown Student',
-            studentId: record.studentId?.studentId || 'N/A',
-            time: new Date().toLocaleTimeString(),
-            rssi: record.rssi || 0
-        };
-
-        setDevices(prev => [newDevice, ...prev].slice(0, 50)); // Keep last 50
+        setDevices(prevDevices => {
+            const newDevicesMap = new Map(prevDevices.map(d => [d.macAddress, d]));
+            const mac = record.macAddress;
+            
+            if (mac) {
+                 newDevicesMap.set(mac, {
+                    id: mac,
+                    studentName: record.studentId?.name || 'Unknown Student',
+                    studentId: record.studentId?.studentId || 'N/A',
+                    macAddress: mac,
+                    time: new Date().toLocaleTimeString(),
+                    rssi: record.rssi || 0,
+                    isRegistered: true
+                });
+            }
+            
+            return Array.from(newDevicesMap.values())
+                .sort((a, b) => b.time.localeCompare(a.time))
+                .slice(0, 50);
+        });
     };
 
     socket.on('device-detected', handleDeviceDetected);
@@ -79,9 +134,61 @@ export default function LiveMonitor() {
   const toggleScanning = () => {
     setIsScanning(!isScanning);
     if (!isScanning) {
-        setDevices([]); // Clear previous session
+        setDevices([]); 
         setSessionTime(0);
     }
+  };
+
+  const openRegisterDialog = (mac: string) => {
+      setSelectedMac(mac);
+      setNewStudentName('');
+      setNewStudentId('');
+      setIsRegisterOpen(true);
+  };
+
+  const handleRegisterSubmit = async () => {
+      if (!newStudentName || !newStudentId) {
+          toast({
+              title: "Error",
+              description: "Please fill in all fields",
+              variant: "destructive"
+          });
+          return;
+      }
+
+      setIsSubmitting(true);
+      try {
+          await api.post('/students', {
+              name: newStudentName,
+              studentId: newStudentId,
+              macAddress: selectedMac,
+              email: `${newStudentId.toLowerCase()}@student.example.com`, // Auto-generate dummy email if needed
+              status: 'active'
+          });
+
+          toast({
+              title: "Success",
+              description: `Registered ${newStudentName} successfully`,
+          });
+          
+          // Optimistically update the local device list to show as registered
+          setDevices(prev => prev.map(d => 
+              d.macAddress === selectedMac 
+              ? { ...d, studentName: newStudentName, studentId: newStudentId, isRegistered: true }
+              : d
+          ));
+
+          setIsRegisterOpen(false);
+      } catch (error: any) {
+          console.error("Registration failed:", error);
+          toast({
+              title: "Registration Failed",
+              description: error.response?.data?.message || "Could not register student",
+              variant: "destructive"
+          });
+      } finally {
+          setIsSubmitting(false);
+      }
   };
 
   return (
@@ -166,10 +273,9 @@ export default function LiveMonitor() {
           <Card className="glass-card shadow-card">
             <CardContent className="p-6">
               <div>
-                <p className="text-sm text-muted-foreground">Attendance Rate</p>
+                <p className="text-sm text-muted-foreground">Known Students</p>
                 <h3 className="text-3xl font-bold mt-2">
-                  {/* Placeholder logic for rate - requires total students count */}
-                   - 
+                   {devices.filter(d => d.isRegistered).length}
                 </h3>
               </div>
             </CardContent>
@@ -184,7 +290,7 @@ export default function LiveMonitor() {
       >
         <Card className="glass-card shadow-card">
           <CardHeader>
-            <CardTitle>Detected Students</CardTitle>
+            <CardTitle>Detected Signal Sources</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -196,25 +302,39 @@ export default function LiveMonitor() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="flex items-center justify-between p-4 rounded-lg bg-accent/50 hover:bg-accent transition-colors"
+                    className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
+                        device.isRegistered ? 'bg-primary/10 border border-primary/20' : 'bg-accent/50 hover:bg-accent'
+                    }`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-primary font-semibold">
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+                          device.isRegistered ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        <span className="font-semibold">
                           {device.studentName.charAt(0)}
                         </span>
                       </div>
                       <div>
                         <p className="font-medium">{device.studentName}</p>
-                        <p className="text-sm text-muted-foreground">{device.studentId}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{device.studentId}</span>
+                            <span>•</span>
+                            <span className="font-mono text-xs">{device.macAddress}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
+                      {!device.isRegistered && (
+                          <Button size="sm" variant="outline" onClick={() => openRegisterDialog(device.macAddress)}>
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Register
+                          </Button>
+                      )}
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Detected at</p>
+                        <p className="text-sm text-muted-foreground">Last Signal</p>
                         <p className="text-sm font-medium">{device.time}</p>
                       </div>
-                      <Badge variant="outline" className="gap-1">
+                      <Badge variant="outline" className={`gap-1 ${device.isRegistered ? 'border-primary/50 text-primary' : ''}`}>
                         <Wifi className="h-3 w-3" />
                         {device.rssi} dBm
                       </Badge>
@@ -234,6 +354,35 @@ export default function LiveMonitor() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Register New Device</DialogTitle>
+                <DialogDescription>
+                    Associate MAC Address {selectedMac} with a student.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name">Student Name</Label>
+                    <Input id="name" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} placeholder="John Doe" />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="sid">Student ID</Label>
+                    <Input id="sid" value={newStudentId} onChange={(e) => setNewStudentId(e.target.value)} placeholder="12345678" />
+                </div>
+                <div className="grid gap-2">
+                    <Label>MAC Address</Label>
+                    <Input value={selectedMac} disabled className="bg-muted" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsRegisterOpen(false)}>Cancel</Button>
+                <Button onClick={handleRegisterSubmit}>Register Student</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

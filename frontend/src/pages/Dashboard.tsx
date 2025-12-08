@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,55 +13,107 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-
-const stats = [
-  {
-    title: 'Total Students',
-    value: '248',
-    icon: Users,
-    color: 'text-primary',
-    bgColor: 'bg-primary/10',
-  },
-  {
-    title: 'Present Today',
-    value: '215',
-    icon: UserCheck,
-    color: 'text-success',
-    bgColor: 'bg-success/10',
-  },
-  {
-    title: 'Absent Today',
-    value: '33',
-    icon: UserX,
-    color: 'text-destructive',
-    bgColor: 'bg-destructive/10',
-  },
-  {
-    title: 'Attendance Rate',
-    value: '86.7%',
-    icon: TrendingUp,
-    color: 'text-warning',
-    bgColor: 'bg-warning/10',
-  },
-];
-
-const attendanceData = [
-  { day: 'Mon', present: 220, absent: 28 },
-  { day: 'Tue', present: 215, absent: 33 },
-  { day: 'Wed', present: 230, absent: 18 },
-  { day: 'Thu', present: 210, absent: 38 },
-  { day: 'Fri', present: 225, absent: 23 },
-];
-
-const recentAttendance = [
-  { id: 1, name: 'Alice Johnson', studentId: 'STU001', time: '08:15 AM', status: 'Present' },
-  { id: 2, name: 'Bob Smith', studentId: 'STU002', time: '08:20 AM', status: 'Present' },
-  { id: 3, name: 'Carol Williams', studentId: 'STU003', time: '08:25 AM', status: 'Present' },
-  { id: 4, name: 'David Brown', studentId: 'STU004', time: '08:30 AM', status: 'Present' },
-  { id: 5, name: 'Eve Davis', studentId: 'STU005', time: '08:35 AM', status: 'Present' },
-];
+import api from '@/lib/api';
+import { format } from 'date-fns';
 
 export default function Dashboard() {
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    presentToday: 0,
+    absentToday: 0,
+    attendanceRate: 0,
+  });
+  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      const [studentsRes, attendanceRes] = await Promise.all([
+        api.get('/students'),
+        api.get('/attendance')
+      ]);
+
+      const students = studentsRes.data.data || studentsRes.data;
+      const attendanceRecords = attendanceRes.data.data || attendanceRes.data;
+
+      const totalStudents = students.length;
+
+      // Filter attendance for today
+      const today = new Date().toDateString();
+      const presentTodayCount = attendanceRecords.filter((record: any) => 
+        new Date(record.timestamp).toDateString() === today && record.status === 'present'
+      ).length;
+
+      const absentToday = Math.max(0, totalStudents - presentTodayCount);
+      const rate = totalStudents > 0 ? ((presentTodayCount / totalStudents) * 100).toFixed(1) : 0;
+
+      setStats({
+        totalStudents,
+        presentToday: presentTodayCount,
+        absentToday,
+        attendanceRate: Number(rate),
+      });
+
+      // Recent 5 records
+      setRecentAttendance(attendanceRecords.slice(0, 5).map((r: any) => ({
+        id: r._id,
+        name: r.studentId?.name || 'Unknown',
+        studentId: r.studentId?.studentId || 'N/A',
+        time: format(new Date(r.timestamp), 'hh:mm a'),
+        status: r.status
+      })));
+
+    } catch (error) {
+      console.error("Failed to fetch dashboard data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const statCards = [
+    {
+      title: 'Total Students',
+      value: stats.totalStudents,
+      icon: Users,
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+    },
+    {
+      title: 'Present Today',
+      value: stats.presentToday,
+      icon: UserCheck,
+      color: 'text-success',
+      bgColor: 'bg-success/10',
+    },
+    {
+      title: 'Absent Today',
+      value: stats.absentToday,
+      icon: UserX,
+      color: 'text-destructive',
+      bgColor: 'bg-destructive/10',
+    },
+    {
+      title: 'Attendance Rate',
+      value: `${stats.attendanceRate}%`,
+      icon: TrendingUp,
+      color: 'text-warning',
+      bgColor: 'bg-warning/10',
+    },
+  ];
+
+  // Placeholder for charts - requires backend aggregation for historical data
+  const attendanceData = [
+    { day: 'Mon', present: 0, absent: 0 },
+    { day: 'Tue', present: 0, absent: 0 },
+    { day: 'Wed', present: 0, absent: 0 },
+    { day: 'Thu', present: 0, absent: 0 },
+    { day: 'Fri', present: 0, absent: 0 },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -70,7 +123,7 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}
@@ -82,7 +135,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <h3 className="text-3xl font-bold mt-2">{stat.value}</h3>
+                    <h3 className="text-3xl font-bold mt-2">{loading ? '-' : stat.value}</h3>
                   </div>
                   <div className={`${stat.bgColor} ${stat.color} p-3 rounded-lg`}>
                     <stat.icon className="h-6 w-6" />
@@ -106,27 +159,9 @@ export default function Dashboard() {
               <CardTitle>Weekly Attendance Trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="day" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="present"
-                    stroke="hsl(var(--success))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--success))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                Chart data requires historical aggregation
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -141,22 +176,9 @@ export default function Dashboard() {
               <CardTitle>Present vs Absent</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="day" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="present" fill="hsl(var(--success))" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="absent" fill="hsl(var(--destructive))" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+               <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                Chart data requires historical aggregation
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -184,7 +206,10 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentAttendance.map((record) => (
+                  {recentAttendance.length === 0 ? (
+                    <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">No recent records</td></tr>
+                  ) : (
+                    recentAttendance.map((record) => (
                     <tr key={record.id} className="border-b border-border/50 hover:bg-accent/50 transition-colors">
                       <td className="py-3 px-4 text-sm">{record.name}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{record.studentId}</td>
@@ -195,7 +220,7 @@ export default function Dashboard() {
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>

@@ -39,16 +39,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
             animate={{ scale: isOpen ? 1 : 0.8 }}
             className="flex items-center gap-2"
           >
-            <div className="rounded-lg bg-primary p-2">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
+            <img src="/AttendIoT_logo.png" alt="AttendIoT Logo" className="h-10 w-10 object-contain" />
             {isOpen && (
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="font-semibold text-lg text-foreground"
               >
-                AttendEase
+                AttendIoT
               </motion.span>
             )}
           </motion.div>

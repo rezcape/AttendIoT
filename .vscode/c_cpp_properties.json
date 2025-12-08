@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "name": "ESP32",
+            "includePath": [
+                "${workspaceFolder}/esp32/AttendIoT",
+                "C:/Users/lenovo/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.3/cores/esp32",
+                "C:/Users/lenovo/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.3/libraries/**",
+                "C:/Users/lenovo/OneDrive/Documents/Arduino/libraries/**",
+                "C:/Users/lenovo/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.3/variants/esp32",
+                "C:/Users/lenovo/AppData/Local/Arduino15/packages/esp32/tools/**"
+            ],
+            "defines": [
+                "ESP32",
+                "ARDUINO=10813",
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "compilerPath": "",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}

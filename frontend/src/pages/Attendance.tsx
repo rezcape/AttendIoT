@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Download, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,34 +11,77 @@ import {
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import api from '@/lib/api';
+import { useSocket } from '@/contexts/SocketContext';
+import { toast } from '@/hooks/use-toast';
 
 interface AttendanceRecord {
-  id: string;
-  date: string;
-  time: string;
-  studentName: string;
-  studentId: string;
-  status: 'Present' | 'Absent';
+  _id: string;
+  studentId: {
+    name: string;
+    studentId: string;
+  };
+  timestamp: string;
+  status: 'present' | 'absent' | 'late'; // Match backend enum usually lowercase
   rssi?: number;
+  deviceId?: string;
 }
 
-const mockRecords: AttendanceRecord[] = [
-  { id: '1', date: '2025-01-15', time: '08:15 AM', studentName: 'Alice Johnson', studentId: 'STU001', status: 'Present', rssi: -45 },
-  { id: '2', date: '2025-01-15', time: '08:20 AM', studentName: 'Bob Smith', studentId: 'STU002', status: 'Present', rssi: -52 },
-  { id: '3', date: '2025-01-15', time: '08:25 AM', studentName: 'Carol Williams', studentId: 'STU003', status: 'Present', rssi: -48 },
-  { id: '4', date: '2025-01-15', time: '09:00 AM', studentName: 'David Brown', studentId: 'STU004', status: 'Absent' },
-  { id: '5', date: '2025-01-14', time: '08:18 AM', studentName: 'Eve Davis', studentId: 'STU005', status: 'Present', rssi: -50 },
-];
-
 export default function Attendance() {
+  const { socket } = useSocket();
   const [dateRange, setDateRange] = useState<{ from: Date; to?: Date }>({
     from: new Date(),
   });
-  const [records] = useState<AttendanceRecord[]>(mockRecords);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchAttendance = async () => {
+    setIsLoading(true);
+    try {
+      // Build query string based on dateRange if needed
+      // For now, just fetch recent
+      const response = await api.get('/attendance');
+      const data = response.data.data || response.data;
+      setRecords(data);
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+       toast({
+        title: 'Error',
+        description: 'Failed to load attendance records',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [dateRange]); // Refetch if date changes (if backend supports filtering)
+
+  // Real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUpdate = (newRecord: any) => {
+        // Prepend new record
+        setRecords(prev => [newRecord, ...prev]);
+    };
+
+    socket.on('attendance-update', handleUpdate);
+
+    return () => {
+        socket.off('attendance-update', handleUpdate);
+    };
+  }, [socket]);
 
   const handleExport = () => {
     // Export functionality would go here
     console.log('Exporting data...');
+    toast({
+        title: "Export",
+        description: "Export feature coming soon!",
+    });
   };
 
   return (
@@ -95,9 +138,16 @@ export default function Attendance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((record, index) => (
+                  {records.length === 0 ? (
+                    <tr>
+                        <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                            {isLoading ? 'Loading...' : 'No attendance records found.'}
+                        </td>
+                    </tr>
+                  ) : (
+                    records.map((record, index) => (
                     <motion.tr
-                      key={record.id}
+                      key={record._id || index}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -105,16 +155,16 @@ export default function Attendance() {
                     >
                       <td className="py-3 px-4 text-sm">
                         <div className="flex flex-col">
-                          <span className="font-medium">{format(new Date(record.date), 'MMM dd, yyyy')}</span>
-                          <span className="text-muted-foreground text-xs">{record.time}</span>
+                          <span className="font-medium">{format(new Date(record.timestamp), 'MMM dd, yyyy')}</span>
+                          <span className="text-muted-foreground text-xs">{format(new Date(record.timestamp), 'hh:mm a')}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm">{record.studentName}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{record.studentId}</td>
+                      <td className="py-3 px-4 text-sm">{record.studentId?.name || 'Unknown'}</td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">{record.studentId?.studentId || 'N/A'}</td>
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            record.status === 'Present'
+                            record.status === 'present'
                               ? 'bg-success/10 text-success'
                               : 'bg-destructive/10 text-destructive'
                           }`}
@@ -145,7 +195,7 @@ export default function Attendance() {
                         )}
                       </td>
                     </motion.tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
