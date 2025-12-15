@@ -7,12 +7,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
 import Attendance from "./pages/Attendance";
 import LiveMonitor from "./pages/LiveMonitor";
-import UploadPage from "./pages/Upload";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -28,7 +26,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             
             <Route
               path="/"
@@ -42,7 +39,6 @@ const App = () => (
               <Route path="students" element={<Students />} />
               <Route path="attendance" element={<Attendance />} />
               <Route path="live-monitor" element={<LiveMonitor />} />
-              <Route path="upload" element={<UploadPage />} />
               <Route path="profile" element={<Profile />} />
             </Route>
 

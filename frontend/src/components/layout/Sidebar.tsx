@@ -1,15 +1,14 @@
-import { NavLink } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { NavLink } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
   ClipboardList,
   Radio,
-  Upload,
   User,
   GraduationCap,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,12 +16,11 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: Users, label: 'Students', path: '/students' },
-  { icon: ClipboardList, label: 'Attendance', path: '/attendance' },
-  { icon: Radio, label: 'Live Monitor', path: '/live-monitor' },
-  { icon: Upload, label: 'Upload Files', path: '/upload' },
-  { icon: User, label: 'Profile', path: '/profile' },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Users, label: "Students", path: "/students" },
+  { icon: ClipboardList, label: "Attendance", path: "/attendance" },
+  { icon: Radio, label: "Live Monitor", path: "/live-monitor" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
@@ -39,7 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
             animate={{ scale: isOpen ? 1 : 0.8 }}
             className="flex items-center gap-2"
           >
-            <img src="/AttendIoT_logo.png" alt="AttendIoT Logo" className="h-10 w-10 object-contain" />
+            <img
+              src="/AttendIoT_logo.png"
+              alt="AttendIoT Logo"
+              className="h-12 w-12 object-contain"
+            />
             {isOpen && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -60,11 +62,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
               to={item.path}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  'hover:bg-accent hover:text-accent-foreground',
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "hover:bg-accent hover:text-accent-foreground",
                   isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground'
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground"
                 )
               }
             >

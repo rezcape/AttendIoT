@@ -16,6 +16,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -36,6 +37,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  const refreshProfile = async () => {
+    try {
+        const response = await api.get('/auth/profile');
+        const userData = response.data.data;
+        
+        const userObj: User = {
+            id: userData._id || userData.id, // Handle both cases
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            studentId: userData.studentId
+        };
+        
+        setUser(userObj);
+        
+        // Update storage if it exists
+        if (localStorage.getItem('user')) {
+            localStorage.setItem('user', JSON.stringify(userObj));
+        }
+        if (sessionStorage.getItem('user')) {
+            sessionStorage.setItem('user', JSON.stringify(userObj));
+        }
+    } catch (error) {
+        console.error("Failed to refresh profile", error);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -169,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

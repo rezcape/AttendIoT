@@ -9,9 +9,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -21,15 +22,30 @@ export default function Profile() {
     confirmPassword: '',
   });
 
-  const handleSaveProfile = () => {
-    toast({
-      title: 'Profile updated',
-      description: 'Your profile information has been successfully updated.',
-    });
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    try {
+        await api.put('/auth/updatedetails', {
+            name: formData.name,
+            email: formData.email
+        });
+        
+        await refreshProfile(); // Refresh global user state
+
+        toast({
+          title: 'Profile updated',
+          description: 'Your profile information has been successfully updated.',
+        });
+        setIsEditing(false);
+    } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.message || 'Failed to update profile',
+          variant: 'destructive',
+        });
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (formData.newPassword !== formData.confirmPassword) {
       toast({
         title: 'Error',
@@ -39,17 +55,30 @@ export default function Profile() {
       return;
     }
 
-    toast({
-      title: 'Password changed',
-      description: 'Your password has been successfully updated.',
-    });
+    try {
+        await api.put('/auth/updatepassword', {
+            currentPassword: formData.currentPassword,
+            newPassword: formData.newPassword
+        });
 
-    setFormData({
-      ...formData,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
+        toast({
+          title: 'Password changed',
+          description: 'Your password has been successfully updated.',
+        });
+
+        setFormData({
+          ...formData,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+    } catch (error: any) {
+         toast({
+          title: 'Error',
+          description: error.response?.data?.message || 'Failed to change password',
+          variant: 'destructive',
+        });
+    }
   };
 
   return (
@@ -87,7 +116,7 @@ export default function Profile() {
                 </div>
                 <div className="text-center">
                   <h3 className="font-semibold text-lg">{user?.name}</h3>
-                  <p className="text-sm text-muted-foreground capitalize">{user?.role}</p>
+                  <p className="text-sm text-muted-foreground capitalize">Lecturer</p>
                 </div>
               </div>
 

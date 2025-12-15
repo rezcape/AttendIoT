@@ -28,34 +28,23 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [studentsRes, attendanceRes] = await Promise.all([
-        api.get('/students'),
-        api.get('/attendance')
+      const [statsRes, attendanceRes] = await Promise.all([
+        api.get('/attendance/stats'),
+        api.get('/attendance?limit=5')
       ]);
 
-      const students = studentsRes.data.data || studentsRes.data;
-      const attendanceRecords = attendanceRes.data.data || attendanceRes.data;
-
-      const totalStudents = students.length;
-
-      // Filter attendance for today
-      const today = new Date().toDateString();
-      const presentTodayCount = attendanceRecords.filter((record: any) => 
-        new Date(record.timestamp).toDateString() === today && record.status === 'present'
-      ).length;
-
-      const absentToday = Math.max(0, totalStudents - presentTodayCount);
-      const rate = totalStudents > 0 ? ((presentTodayCount / totalStudents) * 100).toFixed(1) : 0;
+      const statsData = statsRes.data.data;
+      const recentRecords = attendanceRes.data.data;
 
       setStats({
-        totalStudents,
-        presentToday: presentTodayCount,
-        absentToday,
-        attendanceRate: Number(rate),
+        totalStudents: statsData.totalStudents,
+        presentToday: statsData.presentToday,
+        absentToday: statsData.absentToday,
+        attendanceRate: statsData.attendanceRate,
       });
 
       // Recent 5 records
-      setRecentAttendance(attendanceRecords.slice(0, 5).map((r: any) => ({
+      setRecentAttendance(recentRecords.map((r: any) => ({
         id: r._id,
         name: r.studentId?.name || 'Unknown',
         studentId: r.studentId?.studentId || 'N/A',

@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
             </Avatar>
             <div className="hidden md:flex flex-col items-start">
               <span className="text-sm font-medium">{user?.name}</span>
-              <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
+              <span className="text-xs text-muted-foreground capitalize">Lecturer</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

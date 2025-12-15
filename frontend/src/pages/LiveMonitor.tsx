@@ -30,110 +30,34 @@ interface DetectedDevice {
 }
 
 export default function LiveMonitor() {
-  const { socket, isConnected } = useSocket();
-  const [isScanning, setIsScanning] = useState(false);
-  const [devices, setDevices] = useState<DetectedDevice[]>([]);
-  const [sessionTime, setSessionTime] = useState(0);
+  const { 
+    socket, 
+    isConnected, 
+    isScanning, 
+    setIsScanning, 
+    devices, 
+    setDevices, 
+    sessionTime, 
+    setSessionTime 
+  } = useSocket();
   
   // Registration Dialog State
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [selectedMac, setSelectedMac] = useState('');
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentId, setNewStudentId] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false); // Define missing state
-
-  // Session timer
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isScanning) {
-      interval = setInterval(() => {
-        setSessionTime(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isScanning]);
-
-  // Socket event listeners
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleDeviceDetected = (data: any) => {
-        if (!isScanning) return;
-        
-        // Data structure: { device_id: string, devices: [{ mac: string, rssi: number }] }
-        if (data && data.devices && Array.isArray(data.devices)) {
-            const timestamp = new Date().toLocaleTimeString();
-            
-            setDevices(prevDevices => {
-                const newDevicesMap = new Map(prevDevices.map(d => [d.macAddress, d]));
-                
-                data.devices.forEach((device: any) => {
-                    const existing = newDevicesMap.get(device.mac);
-                    
-                    if (existing) {
-                        newDevicesMap.set(device.mac, {
-                            ...existing,
-                            rssi: device.rssi,
-                            time: timestamp
-                        });
-                    } else {
-                        // Only add if not already present
-                        newDevicesMap.set(device.mac, {
-                            id: device.mac,
-                            studentName: device.name || 'Unknown Device',
-                            studentId: 'Scanning...',
-                            macAddress: device.mac,
-                            time: timestamp,
-                            rssi: device.rssi,
-                            isRegistered: false
-                        });
-                    }
-                });
-                
-                return Array.from(newDevicesMap.values())
-                    .sort((a, b) => b.time.localeCompare(a.time))
-                    .slice(0, 50);
-            });
-        }
-    };
-    
-    const handleAttendanceUpdate = (record: any) => {
-        if (!isScanning) return;
-
-        setDevices(prevDevices => {
-            const newDevicesMap = new Map(prevDevices.map(d => [d.macAddress, d]));
-            const mac = record.macAddress;
-            
-            if (mac) {
-                 newDevicesMap.set(mac, {
-                    id: mac,
-                    studentName: record.studentId?.name || 'Unknown Student',
-                    studentId: record.studentId?.studentId || 'N/A',
-                    macAddress: mac,
-                    time: new Date().toLocaleTimeString(),
-                    rssi: record.rssi || 0,
-                    isRegistered: true
-                });
-            }
-            
-            return Array.from(newDevicesMap.values())
-                .sort((a, b) => b.time.localeCompare(a.time))
-                .slice(0, 50);
-        });
-    };
-
-    socket.on('device-detected', handleDeviceDetected);
-    socket.on('attendance-update', handleAttendanceUpdate);
-
-    return () => {
-      socket.off('device-detected', handleDeviceDetected);
-      socket.off('attendance-update', handleAttendanceUpdate);
-    };
-  }, [socket, isScanning]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleScanning = () => {
     setIsScanning(!isScanning);
-    if (!isScanning) {
+    if (isScanning) { // If we are stopping
+        // Optional: Decide if we want to clear data on stop, or keep it.
+        // User might want to review after stopping. 
+        // Let's keep it. Use a separate "Clear" button if needed.
+        // But the previous behavior was clear on start?
+        // Let's clear on START.
+    } else {
+        // We are starting
         setDevices([]); 
         setSessionTime(0);
     }
@@ -145,6 +69,8 @@ export default function LiveMonitor() {
       setNewStudentId('');
       setIsRegisterOpen(true);
   };
+
+
 
   const handleRegisterSubmit = async () => {
       if (!newStudentName || !newStudentId) {

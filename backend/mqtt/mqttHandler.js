@@ -7,10 +7,31 @@ const handleMQTTMessage = async (topic, message, io) => {
         const payload = JSON.parse(msgString);
 
         console.log(`MQTT Message received on ${topic}`);
-        console.log('Raw Payload:', JSON.stringify(payload, null, 2)); // Debug: Log full payload
+        // console.log('Raw Payload:', JSON.stringify(payload, null, 2)); // Debug: Log full payload
         
-        if (topic === 'attendance/room101/scan') {
-            // Emit raw device detected event
+        if (topic === '5027241085/Attendance/scan') {
+            
+            // Enrich payload with student info so frontend knows who they are immediately
+            if (payload.devices && Array.isArray(payload.devices)) {
+                for (let i = 0; i < payload.devices.length; i++) {
+                    const device = payload.devices[i];
+                    // Normalize MAC just in case
+                    const normalizedMac = device.mac ? device.mac.toLowerCase() : '';
+                    
+                    if (normalizedMac) {
+                        const student = await Student.findOne({ macAddress: normalizedMac });
+                        if (student) {
+                            payload.devices[i].name = student.name;
+                            payload.devices[i].studentId = student.studentId;
+                            payload.devices[i].isRegistered = true;
+                        } else {
+                            payload.devices[i].isRegistered = false;
+                        }
+                    }
+                }
+            }
+
+            // Emit enriched device detected event
             io.emit('device-detected', payload);
 
             if (payload.devices && Array.isArray(payload.devices)) {

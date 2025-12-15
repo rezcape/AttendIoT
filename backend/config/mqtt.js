@@ -15,9 +15,9 @@ const connectMQTT = () => {
 
     client.on('connect', () => {
         console.log(`✓ MQTT connected to broker ${process.env.MQTT_BROKER}:${process.env.MQTT_PORT}`);
-        client.subscribe('attendance/room101/scan', (err) => {
+        client.subscribe('5027241085/Attendance/scan', (err) => {
             if (!err) {
-                console.log('✓ Subscribed to MQTT topic: attendance/room101/scan');
+                console.log('✓ Subscribed to MQTT topic: 5027241085/Attendance/scan');
                 client.publish('attendance/backend/status', 'online');
             }
         });
