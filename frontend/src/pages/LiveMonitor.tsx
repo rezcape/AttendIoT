@@ -82,25 +82,31 @@ export default function LiveMonitor() {
           return;
       }
 
+      const cleanStudentId = newStudentId.trim();
+      const cleanName = newStudentName.trim();
+      // Generate a safe email by removing spaces and special chars from ID
+      const safeIdForEmail = cleanStudentId.replace(/[^a-zA-Z0-9]/g, '');
+      const generatedEmail = `${safeIdForEmail.toLowerCase()}@student.example.com`;
+
       setIsSubmitting(true);
       try {
           await api.post('/students', {
-              name: newStudentName,
-              studentId: newStudentId,
+              name: cleanName,
+              studentId: cleanStudentId,
               macAddress: selectedMac,
-              email: `${newStudentId.toLowerCase()}@student.example.com`, // Auto-generate dummy email if needed
+              email: generatedEmail, 
               status: 'active'
           });
 
           toast({
               title: "Success",
-              description: `Registered ${newStudentName} successfully`,
+              description: `Registered ${cleanName} successfully`,
           });
           
           // Optimistically update the local device list to show as registered
           setDevices(prev => prev.map(d => 
               d.macAddress === selectedMac 
-              ? { ...d, studentName: newStudentName, studentId: newStudentId, isRegistered: true }
+              ? { ...d, studentName: cleanName, studentId: cleanStudentId, isRegistered: true }
               : d
           ));
 

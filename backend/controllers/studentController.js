@@ -128,9 +128,17 @@ exports.createStudent = async (req, res) => {
             data: student
         });
     } catch (err) {
+        let message = 'Error creating student';
+        if (err.code === 11000) {
+            const field = Object.keys(err.keyValue)[0];
+            message = `Duplicate field value entered: ${field}. Please use a unique value.`;
+        } else if (err.name === 'ValidationError') {
+            message = Object.values(err.errors).map(val => val.message).join(', ');
+        }
+
         res.status(400).json({
             success: false,
-            message: 'Error creating student',
+            message: message,
             error: err.message
         });
     }
@@ -166,9 +174,19 @@ exports.updateStudent = async (req, res) => {
             data: student
         });
     } catch (err) {
+        console.error("Update Student Error:", err);
+        
+        let message = 'Error updating student';
+        if (err.code === 11000) {
+            const field = Object.keys(err.keyValue)[0];
+            message = `Duplicate field value entered: ${field}. Please use a unique value.`;
+        } else if (err.name === 'ValidationError') {
+            message = Object.values(err.errors).map(val => val.message).join(', ');
+        }
+
         res.status(400).json({
             success: false,
-            message: 'Error updating student',
+            message: message,
             error: err.message
         });
     }

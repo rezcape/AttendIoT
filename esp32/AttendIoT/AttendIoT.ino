@@ -169,25 +169,30 @@ void loop() {
     }
   }
 
-  // Serialize JSON
-  String output;
-  serializeJson(doc, output);
+  // Serialize JSON and Publish only if any devices were added
+  if (addedCount > 0) {
+    String output;
+    serializeJson(doc, output);
 
-  // Publish to MQTT
-  Serial.print("Publishing payload (Devices: ");
-  Serial.print(addedCount);
-  Serial.print(", Size: ");
-  Serial.print(output.length());
-  Serial.print(" bytes): ");
-  
-  // Ensure buffer is large enough (4KB is usually sufficient for ~10 devices)
-  client.setBufferSize(4096);
+    // Publish to MQTT
+    Serial.print("Publishing payload (Devices: ");
+    Serial.print(addedCount);
+    Serial.print(", Size: ");
+    Serial.print(output.length());
+    Serial.print(" bytes): ");
+    
+    // Ensure buffer is large enough (4KB is usually sufficient for ~10 devices)
+    client.setBufferSize(4096);
 
-  if (client.publish(topic_scan, output.c_str())) {
-    Serial.println("Success");
+    if (client.publish(topic_scan, output.c_str())) {
+      Serial.println("Success");
+    } else {
+      Serial.println("Failed (Payload too big?)");
+    }
   } else {
-    Serial.println("Failed (Payload too big?)");
+    Serial.println("No matching devices found, skipping MQTT publish.");
   }
+
 
   // Clean up
   pBLEScan->clearResults();   // Delete results from BLEScan buffer to release memory

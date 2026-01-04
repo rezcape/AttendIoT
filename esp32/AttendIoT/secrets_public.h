@@ -14,7 +14,7 @@ const char* mqtt_user = "";     // No auth for public test
 const char* mqtt_password = ""; // No auth for public test
 
 // MQTT Topics
-const char* topic_scan = "5027241085/Attendance/scan";
+const char* topic_scan = "b/5027241085/attendance";
 
 // Scanner Identity
 const char* device_id = "scanner_room_101";

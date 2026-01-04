@@ -91,15 +91,23 @@ exports.getStats = async (req, res) => {
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
-        const totalStudents = await Student.countDocuments({ status: 'active' });
+        // Get all active students first
+        const activeStudents = await Student.find({ status: 'active' }).select('_id');
+        const activeStudentIds = activeStudents.map(s => s._id);
+        const totalStudents = activeStudentIds.length;
         
+        // Count present students ONLY from the active list
+        // This prevents deleted students or inactive students from skewing the stats > 100%
         const presentToday = await Attendance.distinct('studentId', {
             timestamp: { $gte: startOfDay, $lte: endOfDay },
-            status: 'present'
+            status: 'present',
+            studentId: { $in: activeStudentIds }
         });
 
         const presentCount = presentToday.length;
-        const absentCount = totalStudents - presentCount;
+        // Ensure absent count is never negative (though with above logic it shouldn't be)
+        const absentCount = Math.max(0, totalStudents - presentCount);
+        
         const attendanceRate = totalStudents > 0 ? (presentCount / totalStudents) * 100 : 0;
 
         res.status(200).json({
